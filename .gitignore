@@ -65,3 +65,6 @@ logs/
 
 # OS
 Thumbs.db
+
+# Embedded Python (too large, use conda instead)
+python-3.7.0-embed-amd64/
