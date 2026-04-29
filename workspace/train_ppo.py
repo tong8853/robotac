@@ -30,6 +30,11 @@ model_dir = Path("./models")
 log_dir.mkdir(parents=True, exist_ok=True)
 model_dir.mkdir(parents=True, exist_ok=True)
 
+# 训练配置
+MODEL_PATH = model_dir / "ppo_metadrive.zip"
+TOTAL_TIMESTEPS = 50000  # 总训练步数
+CONTINUE_TRAINING = MODEL_PATH.exists()  # 自动检测是否已有模型
+
 
 # ==================== 配置 ====================
 
@@ -103,27 +108,35 @@ if __name__ == "__main__":
         seed=42,
     )
 
-    # 创建 PPO 模型（MultiInputPolicy 处理字典观测空间）
-    model = PPO(
-        "MultiInputPolicy",  # 使用MultiInputPolicy处理字典输入
-        env,
-        learning_rate=3e-4,  # 学习率
-        n_steps=512,  # 减少步数
-        batch_size=32,  # 减小批次
-        n_epochs=5,  # 减少轮数
-        gamma=0.99,  # 折扣因子
-        gae_lambda=0.95,  # GAE参数
-        clip_range=0.2,  # PPO裁剪范围
-        device=DEVICE,  # 使用GPU或CPU
-        tensorboard_log=str(log_dir),  # TensorBoard日志目录
-        verbose=1,
-    )
+    # 创建或加载 PPO 模型
+    if CONTINUE_TRAINING:
+        print(f"检测到已有模型，从断点继续训练: {MODEL_PATH}")
+        model = PPO.load(MODEL_PATH, env=env, device=DEVICE)
+        # 继续训练时，目标步数 = 总步数 - 已训练步数
+        remaining_steps = TOTAL_TIMESTEPS - model.num_timesteps
+        print(f"已训练: {model.num_timesteps}, 剩余: {remaining_steps}")
+    else:
+        print(f"从头开始训练")
+        model = PPO(
+            "MultiInputPolicy",  # 使用MultiInputPolicy处理字典输入
+            env,
+            learning_rate=3e-4,  # 学习率
+            n_steps=512,  # 减少步数
+            batch_size=32,  # 减小批次
+            n_epochs=5,  # 减少轮数
+            gamma=0.99,  # 折扣因子
+            gae_lambda=0.95,  # GAE参数
+            clip_range=0.2,  # PPO裁剪范围
+            device=DEVICE,  # 使用GPU或CPU
+            tensorboard_log=str(log_dir),  # TensorBoard日志目录
+            verbose=1,
+        )
+        remaining_steps = TOTAL_TIMESTEPS
 
     # 开始训练
-    total_timesteps = 50000  # 训练50000步
-    print(f"目标训练步数: {total_timesteps}")
+    print(f"目标训练步数: {remaining_steps}")
     model.learn(
-        total_timesteps=total_timesteps,
+        total_timesteps=remaining_steps,
         callback=TensorboardCallback(),
         progress_bar=False,
     )
