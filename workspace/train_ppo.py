@@ -4,6 +4,9 @@ PPO 训练脚本 - 单车路径规划
 使用方法：
     python train_ppo.py
 """
+import torch
+from pathlib import Path
+
 import tqdm
 import gymnasium as gym
 from stable_baselines3 import PPO
@@ -15,6 +18,17 @@ from metadrive import MetaDriveEnv
 from metadrive.component.sensors.rgb_camera import RGBCamera
 from metadrive.component.map.base_map import BaseMap
 from metadrive.component.map.pg_map import MapGenerateMethod
+
+
+# ==================== 设备配置 ====================
+DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
+print(f"使用设备: {DEVICE}")
+
+# 创建日志和模型目录
+log_dir = Path("./logs/ppo_metadrive")
+model_dir = Path("./models")
+log_dir.mkdir(parents=True, exist_ok=True)
+model_dir.mkdir(parents=True, exist_ok=True)
 
 
 # ==================== 配置 ====================
@@ -100,7 +114,8 @@ if __name__ == "__main__":
         gamma=0.99,  # 折扣因子
         gae_lambda=0.95,  # GAE参数
         clip_range=0.2,  # PPO裁剪范围
-        tensorboard_log="./logs/ppo_metadrive",  # TensorBoard日志目录
+        device=DEVICE,  # 使用GPU或CPU
+        tensorboard_log=str(log_dir),  # TensorBoard日志目录
         verbose=1,
     )
 
@@ -114,7 +129,7 @@ if __name__ == "__main__":
     )
 
     # 保存模型
-    save_path = "./models/ppo_metadrive.zip"
+    save_path = model_dir / "ppo_metadrive.zip"
     model.save(save_path)
     print(f"模型已保存: {save_path}")
 
