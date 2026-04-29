@@ -7,12 +7,15 @@ PPO 训练脚本 - 单车路径规划
 import torch
 from pathlib import Path
 
+import numpy as np
 import tqdm
 import gymnasium as gym
 from stable_baselines3 import PPO
 from stable_baselines3.common.callbacks import BaseCallback
 from stable_baselines3.common.env_util import make_vec_env
-import numpy as np
+from stable_baselines3.common.logger import configure
+import wandb
+from wandb.integration import sb3
 
 from metadrive import MetaDriveEnv
 from metadrive.component.sensors.rgb_camera import RGBCamera
@@ -68,7 +71,7 @@ ENV_CONFIG = dict(
 # ==================== 回调 ====================
 
 class TensorboardCallback(BaseCallback):
-    """训练过程中记录关键指标到 TensorBoard"""
+    """训练过程中记录关键指标到 TensorBoard 和 wandb"""
 
     def __init__(self, verbose=0):
         super().__init__(verbose)
@@ -86,9 +89,27 @@ class TensorboardCallback(BaseCallback):
 
     def _on_rollout_end(self):
         if self.episode_rewards:
-            self.logger.record("rollout/ep_rew_mean", np.mean(self.episode_rewards))
-            self.logger.record("rollout/ep_len_mean", np.mean(self.episode_lengths))
-            self.logger.record("rollout/ep_rew_max", np.max(self.episode_rewards))
+            mean_rew = np.mean(self.episode_rewards)
+            max_rew = np.max(self.episode_rewards)
+            mean_len = np.mean(self.episode_lengths)
+
+            # 记录到 TensorBoard
+            self.logger.record("rollout/ep_rew_mean", mean_rew)
+            self.logger.record("rollout/ep_len_mean", mean_len)
+            self.logger.record("rollout/ep_rew_max", max_rew)
+
+            # 本地打印
+            print(f"[迭代 {self.num_timesteps // 512}] 奖励均值: {mean_rew:.2f}, 最大: {max_rew:.2f}, 步数均值: {mean_len:.0f}")
+
+            # 记录到 wandb
+            wandb.log({
+                "iteration": self.num_timesteps // 512,
+                "timesteps": self.num_timesteps,
+                "ep_rew_mean": mean_rew,
+                "ep_rew_max": max_rew,
+                "ep_len_mean": mean_len,
+            })
+
             self.episode_rewards = []
             self.episode_lengths = []
         return True
@@ -100,6 +121,25 @@ if __name__ == "__main__":
     print("=" * 50)
     print("PPO 训练开始 - 单车路径规划")
     print("=" * 50)
+
+    # 初始化 wandb
+    wandb.init(
+        name="ppo_metadrive",
+        project="robotac",
+        entity="tong8853",  # 你的用户名
+        config={
+            "learning_rate": 3e-4,
+            "n_steps": 512,
+            "batch_size": 32,
+            "n_epochs": 5,
+            "gamma": 0.99,
+            "gae_lambda": 0.95,
+            "clip_range": 0.2,
+            "total_timesteps": TOTAL_TIMESTEPS,
+        },
+        sync_tensorboard=True,
+        resume="allow" if CONTINUE_TRAINING else False,
+    )
 
     # 创建向量化环境（减少内存占用）
     env = make_vec_env(
@@ -133,11 +173,19 @@ if __name__ == "__main__":
         )
         remaining_steps = TOTAL_TIMESTEPS
 
+    # 添加 wandb 回调
+    wandb_callback = sb3.WandbCallback(
+        model_save_freq=1000,
+        model_save_path=str(model_dir),
+        verbose=1,
+    )
+    callbacks = [TensorboardCallback(), wandb_callback]
+
     # 开始训练
     print(f"目标训练步数: {remaining_steps}")
     model.learn(
         total_timesteps=remaining_steps,
-        callback=TensorboardCallback(),
+        callback=callbacks,
         progress_bar=False,
     )
 
@@ -171,3 +219,6 @@ if __name__ == "__main__":
     print("测试完成")
     env.close()
     test_env.close()
+
+    # 关闭 wandb
+    wandb.finish()
