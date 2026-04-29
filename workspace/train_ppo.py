@@ -6,6 +6,7 @@ PPO 训练脚本 - 单车路径规划
 """
 import torch
 from pathlib import Path
+import yaml
 
 import numpy as np
 import tqdm
@@ -23,46 +24,51 @@ from metadrive.component.map.base_map import BaseMap
 from metadrive.component.map.pg_map import MapGenerateMethod
 
 
+# ==================== 加载配置 ====================
+CONFIG_PATH = Path(__file__).parent / "config.yaml"
+with open(CONFIG_PATH, "r", encoding="utf-8") as f:
+    config = yaml.safe_load(f)
+
 # ==================== 设备配置 ====================
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 print(f"使用设备: {DEVICE}")
 
-# 创建日志和模型目录
-log_dir = Path("./logs/ppo_metadrive")
-model_dir = Path("./models")
+# 路径配置
+log_dir = Path(config["log_dir"])
+model_dir = Path(config["model_dir"])
 log_dir.mkdir(parents=True, exist_ok=True)
 model_dir.mkdir(parents=True, exist_ok=True)
 
 # 训练配置
-MODEL_PATH = model_dir / "ppo_metadrive.zip"
-TOTAL_TIMESTEPS = 50000  # 总训练步数
+MODEL_PATH = model_dir / config["model_name"]
+TOTAL_TIMESTEPS = config["total_timesteps"]
 CONTINUE_TRAINING = MODEL_PATH.exists()  # 自动检测是否已有模型
 
 
 # ==================== 配置 ====================
 
 MAP_CONFIG = {
-    BaseMap.GENERATE_TYPE: MapGenerateMethod.BIG_BLOCK_NUM,
-    BaseMap.GENERATE_CONFIG: 3,  # 3个路段（小地图，快速验证）
-    BaseMap.LANE_WIDTH: 4,
-    BaseMap.LANE_NUM: 1,
+    BaseMap.GENERATE_TYPE: config["map_config"]["generate_type"],
+    BaseMap.GENERATE_CONFIG: config["map_config"]["generate_config"],
+    BaseMap.LANE_WIDTH: config["map_config"]["lane_width"],
+    BaseMap.LANE_NUM: config["map_config"]["lane_num"],
 }
 
 ENV_CONFIG = dict(
-    use_render=False,  # 训练时关闭渲染加速
-    manual_control=False,
-    traffic_density=0.0,
-    num_scenarios=10000,
-    random_agent_model=False,
-    on_continuous_line_done=True,
-    out_of_route_done=True,
-    image_observation=True,
-    sensors=dict(rgb_camera=(RGBCamera, 160, 90)),  # 降低分辨率加速
+    use_render=config["env_config"]["use_render"],
+    manual_control=config["env_config"]["manual_control"],
+    traffic_density=config["env_config"]["traffic_density"],
+    num_scenarios=config["env_config"]["num_scenarios"],
+    random_agent_model=config["env_config"]["random_agent_model"],
+    on_continuous_line_done=config["env_config"]["on_continuous_line_done"],
+    out_of_route_done=config["env_config"]["out_of_route_done"],
+    image_observation=config["env_config"]["image_observation"],
+    sensors=dict(rgb_camera=(RGBCamera, config["env_config"]["rgb_camera_width"], config["env_config"]["rgb_camera_height"])),
     norm_pixel=True,  # SB3需要归一化像素
     vehicle_config=dict(
-        show_lidar=False,
-        show_navi_mark=False,
-        show_line_to_navi_mark=False,
+        show_lidar=config["env_config"]["show_lidar"],
+        show_navi_mark=config["env_config"]["show_navi_mark"],
+        show_line_to_navi_mark=config["env_config"]["show_line_to_navi_mark"],
     ),
     map_config=MAP_CONFIG,
 )
@@ -124,17 +130,17 @@ if __name__ == "__main__":
 
     # 初始化 wandb
     wandb.init(
-        name="ppo_metadrive",
-        project="robotac",
-        entity="tong8853",  # 你的用户名
+        name=config["wandb"]["name"],
+        project=config["wandb"]["project"],
+        entity=config["wandb"]["entity"],
         config={
-            "learning_rate": 3e-4,
-            "n_steps": 512,
-            "batch_size": 32,
-            "n_epochs": 5,
-            "gamma": 0.99,
-            "gae_lambda": 0.95,
-            "clip_range": 0.2,
+            "learning_rate": config["learning_rate"],
+            "n_steps": config["n_steps"],
+            "batch_size": config["batch_size"],
+            "n_epochs": config["n_epochs"],
+            "gamma": config["gamma"],
+            "gae_lambda": config["gae_lambda"],
+            "clip_range": config["clip_range"],
             "total_timesteps": TOTAL_TIMESTEPS,
         },
         sync_tensorboard=True,
@@ -144,8 +150,8 @@ if __name__ == "__main__":
     # 创建向量化环境（减少内存占用）
     env = make_vec_env(
         lambda: MetaDriveEnv(ENV_CONFIG),
-        n_envs=1,  # 只用1个环境（减少内存）
-        seed=42,
+        n_envs=config["n_envs"],
+        seed=config["seed"],
     )
 
     # 创建或加载 PPO 模型
@@ -160,13 +166,13 @@ if __name__ == "__main__":
         model = PPO(
             "MultiInputPolicy",  # 使用MultiInputPolicy处理字典输入
             env,
-            learning_rate=3e-4,  # 学习率
-            n_steps=512,  # 减少步数
-            batch_size=32,  # 减小批次
-            n_epochs=5,  # 减少轮数
-            gamma=0.99,  # 折扣因子
-            gae_lambda=0.95,  # GAE参数
-            clip_range=0.2,  # PPO裁剪范围
+            learning_rate=config["learning_rate"],
+            n_steps=config["n_steps"],
+            batch_size=config["batch_size"],
+            n_epochs=config["n_epochs"],
+            gamma=config["gamma"],
+            gae_lambda=config["gae_lambda"],
+            clip_range=config["clip_range"],
             device=DEVICE,  # 使用GPU或CPU
             tensorboard_log=str(log_dir),  # TensorBoard日志目录
             verbose=1,
@@ -175,7 +181,7 @@ if __name__ == "__main__":
 
     # 添加 wandb 回调
     wandb_callback = sb3.WandbCallback(
-        model_save_freq=1000,
+        model_save_freq=config["wandb"]["model_save_freq"],
         model_save_path=str(model_dir),
         verbose=1,
     )
