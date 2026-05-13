@@ -1,0 +1,45 @@
+# PPO 训练配置 - ROBOTAC 数字仿真挑战赛
+
+# 训练参数
+total_timesteps: 100000
+learning_rate: 3.0e-4
+n_steps: 512
+batch_size: 32
+n_epochs: 5
+gamma: 0.99
+gae_lambda: 0.95
+clip_range: 0.2
+
+# 环境参数
+map_config:
+  generate_type: "big_block_num"
+  generate_config: 3
+  lane_width: 4
+  lane_num: 1
+
+env_config:
+  use_render: false
+  manual_control: false
+  traffic_density: 0.0
+  num_scenarios: 10000
+  random_agent_model: false
+  on_continuous_line_done: true
+  out_of_route_done: true
+  image_observation: true
+  rgb_camera_width: 160
+  rgb_camera_height: 90
+  show_lidar: false
+  show_navi_mark: false
+  show_line_to_navi_mark: false
+
+# 训练参数
+n_envs: 1
+seed: 42
+
+# 路径配置
+log_dir: "./logs/ppo_metadrive"
+model_dir: "./models"
+model_name: "ppo_metadrive.zip"
+
+# 延迟配置
+latency_threshold_ms: 100

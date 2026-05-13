@@ -1,0 +1,26 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(conda env:*)",
+      "Bash(conda run:*)",
+      "WebFetch(domain:github.com)",
+      "WebSearch",
+      "Bash(gh repo:*)",
+      "Bash(gh api:*)",
+      "Bash(conda activate:*)",
+      "Bash(python -c \"from metadrive import MetaDriveEnv; print\\('OK'\\)\")",
+      "Bash(python train_ppo.py)",
+      "Bash(pip list:*)",
+      "Bash(python train_ppo_simple.py)",
+      "Bash(python -c \"import metadrive; print\\(metadrive.__version__\\)\")",
+      "Bash(python -c \"import metadrive; print\\(dir\\(metadrive\\)\\)\")",
+      "Bash(python -c \"import metadrive; print\\(metadrive.version\\)\")",
+      "Bash(python -c \"from metadrive.envs import MetaDriveEnv; env = MetaDriveEnv\\({'use_render': False, 'num_scenarios': 1}\\); print\\('OK'\\); env.close\\(\\)\")",
+      "Bash(python -c ':*)",
+      "Bash(rm -f models/ppo_metadrive.zip)",
+      "Bash(python -u train_ppo.py)",
+      "Bash(rm:*)",
+      "Bash(python test_ppo.py)"
+    ]
+  }
+}
