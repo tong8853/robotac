@@ -20,7 +20,11 @@
       "Bash(rm -f models/ppo_metadrive.zip)",
       "Bash(python -u train_ppo.py)",
       "Bash(rm:*)",
-      "Bash(python test_ppo.py)"
+      "Bash(python test_ppo.py)",
+      "PowerShell(& \"C:\\\\Users\\\\m1566\\\\.conda\\\\envs\\\\robotac\\\\Scripts\\\\activate.bat\" robotac; python -c \"import torch; print\\('PyTorch:', torch.__version__\\); print\\('CUDA available:', torch.cuda.is_available\\(\\)\\); print\\('GPU:', torch.cuda.get_device_name\\(0\\) if torch.cuda.is_available\\(\\) else 'None'\\)\")",
+      "PowerShell($env:PATH = \"C:\\\\Users\\\\m1566\\\\.conda\\\\envs\\\\robotac;C:\\\\Users\\\\m1566\\\\.conda\\\\envs\\\\robotac\\\\Scripts;$env:PATH\"; & \"C:\\\\Users\\\\m1566\\\\.conda\\\\envs\\\\robotac\\\\python.exe\" -c \"import torch; print\\('PyTorch:', torch.__version__\\); print\\('CUDA available:', torch.cuda.is_available\\(\\)\\); print\\('GPU:', torch.cuda.get_device_name\\(0\\) if torch.cuda.is_available\\(\\) else 'None'\\)\")",
+      "PowerShell($env:PATH = \"C:\\\\Users\\\\m1566\\\\.conda\\\\envs\\\\robotac;C:\\\\Users\\\\m1566\\\\.conda\\\\envs\\\\robotac\\\\Scripts;$env:PATH\"; & \"C:\\\\Users\\\\m1566\\\\.conda\\\\envs\\\\robotac\\\\python.exe\" -m pip install -r D:\\\\robotac\\\\requirements.txt)",
+      "PowerShell(conda activate *)"
     ]
   }
 }

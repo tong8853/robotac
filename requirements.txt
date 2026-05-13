@@ -2,7 +2,7 @@
 # 使用方法: pip install -r requirements.txt
 
 # 核心环境
-gymnasium==0.28.1
+gymnasium==0.26.3
 numpy==1.21.6
 torch==1.13.1
 torchvision==0.14.1
