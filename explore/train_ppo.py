@@ -18,8 +18,9 @@ from stable_baselines3 import PPO
 from stable_baselines3.common.callbacks import BaseCallback
 from stable_baselines3.common.env_util import make_vec_env
 
-from metadrive import MetaDriveEnv
+from metadrive.envs import MetaDriveEnv
 from metadrive.component.sensors.rgb_camera import RGBCamera
+from observation_wrapper import ImageObservationWrapper
 from reward_function import compute_reward, check_violation
 
 # ==================== 设备配置（设备无关）====================
@@ -60,18 +61,16 @@ ENV_CONFIG = dict(
     random_agent_model=False,
     on_continuous_line_done=True,  # 压白实线检测
     out_of_route_done=True,  # 偏离路线检测
-    image_observation=True,  # 仅使用视觉输入
-    sensors=dict(
-        rgb_camera=(RGBCamera, config["env_config"]["rgb_camera_width"], config["env_config"]["rgb_camera_height"])
-    ),
-    norm_pixel=True,  # SB3需要归一化像素
+    image_observation=True,  # 使用图像观测（规则4.1要求）
+    sensors=dict(rgb_camera=(RGBCamera, 160, 90)),
     vehicle_config=dict(
         show_lidar=False,  # 禁用Lidar - 规则4.1
         show_navi_mark=False,  # 禁用导航标记 - 规则4.1
         show_line_to_navi_mark=False,  # 禁用导航线 - 规则4.1
-        image_source="rgb_camera",  # 使用RGB摄像头作为图像源
+        image_source="rgb_camera",
     ),
     map_config=MAP_CONFIG,
+    norm_pixel=True,  # 像素值归一化到[0,1]
 )
 
 
@@ -86,11 +85,8 @@ def make_env():
             random_agent_model=False,
             on_continuous_line_done=True,
             out_of_route_done=True,
-            image_observation=True,
-            sensors=dict(
-                rgb_camera=(RGBCamera, config["env_config"]["rgb_camera_width"], config["env_config"]["rgb_camera_height"])
-            ),
-            norm_pixel=True,
+            image_observation=True,  # 使用图像观测（规则4.1要求）
+            sensors=dict(rgb_camera=(RGBCamera, 160, 90)),
             vehicle_config=dict(
                 show_lidar=False,
                 show_navi_mark=False,
@@ -98,7 +94,10 @@ def make_env():
                 image_source="rgb_camera",
             ),
             map_config=MAP_CONFIG,
+            norm_pixel=True,
         ))
+        # 使用观察变换包装器将图像转换为SB3兼容格式
+        env = ImageObservationWrapper(env)
         return env
     return _init
 
@@ -218,7 +217,7 @@ if __name__ == "__main__":
         print(f"已训练: {model.num_timesteps}, 剩余: {remaining_steps}")
     else:
         print("从头开始训练")
-        # 使用 MultiInputPolicy 处理图像+状态输入
+        # 使用 MultiInputPolicy 处理 Dict 观测空间（图像+状态向量）
         model = PPO(
             "MultiInputPolicy",
             env,
@@ -262,7 +261,8 @@ if __name__ == "__main__":
     print("测试模型...")
     print("=" * 50)
 
-    test_env = MetaDriveEnv(ENV_CONFIG)
+    env.close()  # 关闭训练环境
+    test_env = ImageObservationWrapper(MetaDriveEnv(ENV_CONFIG))
 
     for i in range(3):
         total_reward = 0
