@@ -8,11 +8,10 @@ torch==1.13.1
 torchvision==0.14.1
 
 # MetaDrive 仿真环境
-metadrive==1.4.35
 metadrive-simulator==0.4.3
 
 # 强化学习
-stable-baselines3==2.0.0
+stable-baselines3==1.8.0
 
 # 数据处理与可视化
 opencv-python==4.13.0.92
