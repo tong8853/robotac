@@ -14,8 +14,9 @@ import numpy as np
 import gymnasium as gym
 from stable_baselines3 import PPO
 
-from metadrive import MetaDriveEnv
+from metadrive.envs import MetaDriveEnv
 from metadrive.component.sensors.rgb_camera import RGBCamera
+from observation_wrapper import ImageObservationWrapper
 from reward_function import check_violation
 
 # ==================== 设备配置（设备无关）====================
@@ -47,10 +48,7 @@ ENV_CONFIG = dict(
     on_continuous_line_done=True,
     out_of_route_done=True,
     image_observation=True,
-    sensors=dict(
-        rgb_camera=(RGBCamera, config["env_config"]["rgb_camera_width"], config["env_config"]["rgb_camera_height"])
-    ),
-    norm_pixel=True,
+    sensors=dict(rgb_camera=(RGBCamera, 160, 90)),
     vehicle_config=dict(
         show_lidar=False,
         show_navi_mark=False,
@@ -58,6 +56,7 @@ ENV_CONFIG = dict(
         image_source="rgb_camera",
     ),
     map_config=MAP_CONFIG,
+    norm_pixel=True,
 )
 
 
@@ -220,7 +219,7 @@ if __name__ == "__main__":
 
     # 创建环境
     print("创建仿真环境...")
-    env = MetaDriveEnv(ENV_CONFIG)
+    env = ImageObservationWrapper(MetaDriveEnv(ENV_CONFIG))
 
     # 运行验证
     print("\n开始验证测试...\n")
