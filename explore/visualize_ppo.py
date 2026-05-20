@@ -1,5 +1,5 @@
 """
-可视化验证脚本 - 生成 GIF 动画和性能报告
+可视化验证脚本 - 生成 GIF 动画和性能报告（第一人称视角）
 
 使用方法:
     conda activate robotac
@@ -11,15 +11,15 @@ import yaml
 from pathlib import Path
 
 import numpy as np
-import gymnasium as gym
 from stable_baselines3 import PPO
 
 from metadrive.envs import MetaDriveEnv
 from metadrive.component.sensors.rgb_camera import RGBCamera
+from metadrive.utils.doc_utils import generate_gif
 from observation_wrapper import ImageObservationWrapper
 from reward_function import check_violation
 
-# ==================== 设备配置（设备无关）====================
+# ==================== 设备配置 ====================
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"使用设备: {DEVICE}")
 
@@ -30,6 +30,9 @@ with open(CONFIG_PATH, "r", encoding="utf-8") as f:
     config = yaml.safe_load(f)
 
 MODEL_PATH = Path(__file__).parent / "models" / config["model_name"]
+GIF_DIR = Path(__file__).parent / "Gif"
+GIF_DIR.mkdir(exist_ok=True)
+
 
 # ==================== 环境配置 ====================
 MAP_CONFIG = dict(
@@ -40,15 +43,16 @@ MAP_CONFIG = dict(
 )
 
 ENV_CONFIG = dict(
-    use_render=True,  # 渲染开启用于可视化
+    use_render=False,
     manual_control=False,
+    num_agents=1,
     traffic_density=0.0,
     num_scenarios=10000,
     random_agent_model=False,
     on_continuous_line_done=True,
     out_of_route_done=True,
     image_observation=True,
-    sensors=dict(rgb_camera=(RGBCamera, 160, 90)),
+    sensors=dict(rgb_camera=(RGBCamera, 320, 180)),  # 提升分辨率以生成更清晰的GIF
     vehicle_config=dict(
         show_lidar=False,
         show_navi_mark=False,
@@ -56,88 +60,12 @@ ENV_CONFIG = dict(
         image_source="rgb_camera",
     ),
     map_config=MAP_CONFIG,
-    norm_pixel=True,
+    norm_pixel=False,  # 与训练一致
 )
 
 
-def run_validation_episode(model, env, max_steps=1000, render=True):
-    """
-    运行单个验证 episode
-
-    返回:
-        stats: dict, 包含 episode 统计数据
-    """
-    obs, _ = env.reset()
-    episode_reward = 0.0
-    step_count = 0
-    episode_start = time.time()
-
-    # 获取车辆对象用于违规检测
-    vehicle = env.agent
-
-    # 统计
-    violations = {"minor": 0, "major": 0}
-    speeds = []
-    latencies = []
-
-    for step in range(max_steps):
-        # 延迟测量
-        step_start = time.time()
-        action, _ = model.predict(obs, deterministic=True)
-        latency_ms = (time.time() - step_start) * 1000
-        latencies.append(latency_ms)
-
-        obs, reward, terminated, truncated, info = env.step(action)
-        episode_reward += reward
-        step_count += 1
-
-        # 统计违规（通过 vehicle 直接检测）
-        violation_type, severity = check_violation(info, vehicle)
-        if violation_type is not None:
-            if severity == "minor":
-                violations["minor"] += 1
-            elif severity == "major":
-                violations["major"] += 1
-
-        # 记录速度
-        if hasattr(vehicle, 'speed_m_s'):
-            speeds.append(vehicle.speed_m_s * 3.6)  # m/s 转 km/h
-        elif isinstance(obs, dict) and "state" in obs:
-            vx, vy = obs["state"][0], obs["state"][1]
-            speeds.append(np.sqrt(vx**2 + vy**2) * 3.6)
-
-        if render:
-            env.render()
-
-        if terminated or truncated:
-            break
-
-    episode_time = time.time() - episode_start
-
-    stats = {
-        "episode_reward": episode_reward,
-        "step_count": step_count,
-        "episode_time": episode_time,
-        "arrive_dest": info.get("arrive_dest", False),
-        "violations": violations,
-        "avg_speed": np.mean(speeds) if speeds else 0.0,
-        "max_speed": np.max(speeds) if speeds else 0.0,
-        "avg_latency_ms": np.mean(latencies) if latencies else 0.0,
-        "max_latency_ms": np.max(latencies) if latencies else 0.0,
-        "success": info.get("arrive_dest", False),
-    }
-
-    return stats
-
-
 def generate_performance_report(stats_list, output_path="performance_report.md"):
-    """
-    生成性能报告
-
-    参数:
-        stats_list: list of dict, 多个 episode 的统计数据
-        output_path: str, 输出文件路径
-    """
+    """生成性能报告"""
     total_episodes = len(stats_list)
     successful_episodes = sum(1 for s in stats_list if s["arrive_dest"])
     total_minor_violations = sum(s["violations"]["minor"] for s in stats_list)
@@ -195,57 +123,110 @@ def generate_performance_report(stats_list, output_path="performance_report.md")
 
     with open(output_path, "w", encoding="utf-8") as f:
         f.write(report)
-
     print(f"\n性能报告已保存: {output_path}")
-    return report
 
 
 # ==================== 主程序 ====================
 if __name__ == "__main__":
     print("=" * 60)
-    print("ROBOTAC 模型可视化验证")
+    print("ROBOTAC 模型可视化验证 (第一人称视角GIF)")
     print("=" * 60)
     print(f"设备: {DEVICE}")
 
-    # 检查模型
     if not MODEL_PATH.exists():
         print(f"错误: 模型文件不存在: {MODEL_PATH}")
-        print("请先运行 train_ppo.py 训练模型")
         exit(1)
 
-    # 加载模型
     print(f"加载模型: {MODEL_PATH}")
     model = PPO.load(MODEL_PATH, device=DEVICE)
 
-    # 创建环境
+    # 创建单一环境
     print("创建仿真环境...")
     env = ImageObservationWrapper(MetaDriveEnv(ENV_CONFIG))
 
-    # 运行验证
-    print("\n开始验证测试...\n")
+    print("\n开始验证测试 (生成第一人称视角GIF)...\n")
     n_episodes = 3
     stats_list = []
 
     for i in range(n_episodes):
         print(f"--- Episode {i+1}/{n_episodes} ---")
-        stats = run_validation_episode(model, env, max_steps=1000, render=True)
+
+        # 重置环境
+        obs, _ = env.reset()
+
+        episode_reward = 0.0
+        step_count = 0
+        episode_start = time.time()
+        vehicle = env.agent
+
+        violations = {"minor": 0, "major": 0}
+        speeds = []
+        latencies = []
+        frames = []  # 存储GIF帧
+
+        max_steps = 1000
+        for step in range(max_steps):
+            step_start = time.time()
+            action, _ = model.predict(obs, deterministic=True)
+            latency_ms = (time.time() - step_start) * 1000
+            latencies.append(latency_ms)
+
+            # 执行动作
+            obs, reward, terminated, truncated, info = env.step(action)
+            episode_reward += reward
+            step_count += 1
+
+            violation_type, severity = check_violation(info, vehicle)
+            if violation_type is not None:
+                if severity == "minor":
+                    violations["minor"] += 1
+                elif severity == "major":
+                    violations["major"] += 1
+
+            if hasattr(vehicle, 'speed_m_s'):
+                speeds.append(vehicle.speed_m_s * 3.6)
+
+            # 捕获第一人称视角帧
+            img_obs = env.env.observations['default_agent'].img_obs
+            frame = img_obs.get_image()  # (H, W, 3), uint8 [0, 255] with norm_pixel=False
+            frames.append(frame[..., ::-1])  # RGB转BGR
+
+            if terminated or truncated:
+                break
+
+        episode_time = time.time() - episode_start
+
+        # 保存GIF（使用MetaDrive内置函数）
+        gif_path = GIF_DIR / f"episode_{i+1}.gif"
+        generate_gif(frames, gif_name=str(gif_path), duration=100)
+        print(f"  GIF 已保存: {gif_path}")
+
+        stats = {
+            "episode_reward": episode_reward,
+            "step_count": step_count,
+            "episode_time": episode_time,
+            "arrive_dest": info.get("arrive_dest", False),
+            "violations": violations,
+            "avg_speed": np.mean(speeds) if speeds else 0.0,
+            "max_speed": np.max(speeds) if speeds else 0.0,
+            "avg_latency_ms": np.mean(latencies) if latencies else 0.0,
+            "max_latency_ms": np.max(latencies) if latencies else 0.0,
+        }
         stats_list.append(stats)
 
         print(f"  到达终点: {'是' if stats['arrive_dest'] else '否'}")
         print(f"  奖励: {stats['episode_reward']:.2f}")
         print(f"  步数: {stats['step_count']}")
-        print(f"  耗时: {stats['episode_time']:.2f}秒")
-        print(f"  轻微违规(压线): {stats['violations']['minor']}次")
-        print(f"  严重违规(碰撞/越界): {stats['violations']['major']}次")
-        print(f"  平均延迟: {stats['avg_latency_ms']:.2f}ms")
+        print(f"  捕获帧数: {len(frames)}")
+        print(f"  轻微违规: {stats['violations']['minor']}次")
+        print(f"  严重违规: {stats['violations']['major']}次")
         print()
 
     env.close()
 
-    # 生成报告
     report_path = Path(__file__).parent / "performance_report.md"
     generate_performance_report(stats_list, str(report_path))
 
     print("=" * 60)
-    print("验证完成!")
+    print(f"验证完成! GIF已保存到: {GIF_DIR}")
     print("=" * 60)

@@ -1,11 +1,11 @@
 # PPO 训练配置 - ROBOTAC 数字仿真挑战赛
 
 # 训练参数
-total_timesteps: 200000
+total_timesteps: 400000
 learning_rate: 3.0e-4
-n_steps: 512
-batch_size: 32
-n_epochs: 5
+n_steps: 2048       # 更大的rollout buffer
+batch_size: 256     # RTX 4060 Laptop (8GB) 可用更大batch
+n_epochs: 10        # 更多epoch
 gamma: 0.99
 gae_lambda: 0.95
 clip_range: 0.2
@@ -27,16 +27,16 @@ env_config:
   out_of_route_done: true
   image_observation: true
   sensors:
-    rgb_camera: [160, 90]
-  vehicle_config:
+    rgb_camera: [320, 180]  # 提升分辨率以生成更清晰的GIF
+  vehic
     show_lidar: false
     show_navi_mark: false
     show_line_to_navi_mark: false
     image_source: "rgb_camera"
-  norm_pixel: true
+  norm_pixel: false  # 保持uint8格式
 
-# 训练参数
-n_envs: 1
+# 训练参数 - RTX 4060 优化
+n_envs: 1           # Windows 上 SubprocVecEnv 与 MetaDrive 有兼容性问题
 seed: 42
 
 # 路径配置

@@ -50,7 +50,18 @@
       "PowerShell(python -c \"import torch; print\\('torch:', torch.__version__\\); print\\('CUDA available:', torch.cuda.is_available\\(\\)\\); print\\('GPU:', torch.cuda.get_device_name\\(0\\) if torch.cuda.is_available\\(\\) else 'N/A'\\)\")",
       "PowerShell(Get-Process *)",
       "PowerShell(python -c \"from tensorboard.backend.event_processing import event_accumulator; ea = event_accumulator.EventAccumulator\\(r'D:\\\\robotac\\\\explore\\\\logs\\\\ppo_metadrive\\\\PPO_3'\\); ea.Reload\\(\\); print\\('Events:', ea.Tags\\(\\)\\); print\\('Steps:', ea.Scalars\\('rollout/ep_rew_mean'\\)[-1] if ea.Scalars\\('rollout/ep_rew_mean'\\) else 'No data'\\)\")",
-      "PowerShell(nvidia-smi *)"
+      "PowerShell(nvidia-smi *)",
+      "PowerShell(cd D:\\\\robotac\\\\explore; $env:PYTHONPATH = \"D:\\\\robotac\\\\explore\"; python generate_gif.py 2>&1)",
+      "PowerShell(cd D:\\\\robotac\\\\explore; $env:PYTHONPATH = \"D:\\\\robotac\\\\explore\"; python visualize_ppo.py 2>&1)",
+      "PowerShell(head *)",
+      "PowerShell(cd D:\\\\robotac\\\\explore; $env:PYTHONPATH = \"D:\\\\robotac\\\\explore\"; python train_ppo.py 2>&1)",
+      "PowerShell(nvcc *)",
+      "PowerShell($env:CUDA_PATH; $env:CUDA_PATH_V12_7)",
+      "PowerShell(python -c \"import cupy; print\\(cupy.cuda.is_available\\(\\)\\); print\\(cupy.cuda.Device\\(\\)\\)\" 2>&1)",
+      "PowerShell(Invoke-WebRequest -Uri \"https://developer.nvidia.com/cuda-11-7-1-download-archive\" -OutFile \"C:\\\\cuda_page.html\" -UseBasicParsing; Get-Content \"C:\\\\cuda_page.html\" -TotalCount 50)",
+      "PowerShell(New-Item *)",
+      "PowerShell(python -c \"import torch; print\\(f'PyTorch CUDA: {torch.version.cuda}'\\); print\\(f'CUDA available: {torch.cuda.is_available\\(\\)}'\\)\")",
+      "PowerShell(python -c \"import cupy; print\\('CuPy version:', cupy.__version__\\); print\\('CUDA available:', cupy.cuda.is_available\\(\\)\\); d = cupy.cuda.Device\\(\\); print\\('Device:', d\\)\")"
     ]
   }
 }

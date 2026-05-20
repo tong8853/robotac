@@ -17,6 +17,7 @@ import gymnasium as gym
 from stable_baselines3 import PPO
 from stable_baselines3.common.callbacks import BaseCallback
 from stable_baselines3.common.env_util import make_vec_env
+from stable_baselines3.common.vec_env import SubprocVecEnv
 
 from metadrive.envs import MetaDriveEnv
 from metadrive.component.sensors.rgb_camera import RGBCamera
@@ -56,13 +57,14 @@ MAP_CONFIG = dict(
 ENV_CONFIG = dict(
     use_render=False,
     manual_control=False,
+    num_agents=1,
     traffic_density=0.0,  # 无其他车辆干扰
     num_scenarios=10000,
     random_agent_model=False,
     on_continuous_line_done=True,  # 压白实线检测
     out_of_route_done=True,  # 偏离路线检测
     image_observation=True,  # 使用图像观测（规则4.1要求）
-    sensors=dict(rgb_camera=(RGBCamera, 160, 90)),
+    sensors=dict(rgb_camera=(RGBCamera, 320, 180)),  # 提升分辨率以生成更清晰的GIF
     vehicle_config=dict(
         show_lidar=False,  # 禁用Lidar - 规则4.1
         show_navi_mark=False,  # 禁用导航标记 - 规则4.1
@@ -70,23 +72,24 @@ ENV_CONFIG = dict(
         image_source="rgb_camera",
     ),
     map_config=MAP_CONFIG,
-    norm_pixel=True,  # 像素值归一化到[0,1]
+    norm_pixel=False,  # 保持uint8格式，与赛方样例一致
 )
 
 
-def make_env():
+def make_env(seed=0):
     """创建单个环境的工厂函数（用于向量化环境）"""
     def _init():
         env = MetaDriveEnv(dict(
             use_render=False,
             manual_control=False,
+            num_agents=1,
             traffic_density=0.0,
             num_scenarios=10000,
             random_agent_model=False,
             on_continuous_line_done=True,
             out_of_route_done=True,
-            image_observation=True,  # 使用图像观测（规则4.1要求）
-            sensors=dict(rgb_camera=(RGBCamera, 160, 90)),
+            image_observation=True,
+            sensors=dict(rgb_camera=(RGBCamera, 320, 180)),  # 提升分辨率以生成更清晰的GIF
             vehicle_config=dict(
                 show_lidar=False,
                 show_navi_mark=False,
@@ -94,9 +97,9 @@ def make_env():
                 image_source="rgb_camera",
             ),
             map_config=MAP_CONFIG,
-            norm_pixel=True,
+            norm_pixel=False,
+            start_seed=seed,  # MetaDrive 使用 start_seed
         ))
-        # 使用观察变换包装器将图像转换为SB3兼容格式
         env = ImageObservationWrapper(env)
         return env
     return _init
@@ -202,12 +205,15 @@ if __name__ == "__main__":
     print("合规配置: 仅使用RGB摄像头, 无Lidar, 无导航标记")
     print("=" * 60)
 
-    # 创建向量化环境（使用官方推荐的 gym.make 接口）
-    env = make_vec_env(
-        make_env(),
-        n_envs=config["n_envs"],
-        seed=config["seed"],
-    )
+    # 创建向量化环境
+    n_envs = config["n_envs"]
+    seed = config["seed"]
+    if n_envs == 1:
+        # 单环境使用 DummyVecEnv
+        env = make_vec_env(make_env(seed), n_envs=1, seed=seed)
+    else:
+        # 多环境使用 SubprocVecEnv（Linux/Mac 推荐）
+        env = SubprocVecEnv([make_env(seed + i) for i in range(n_envs)])
 
     # 创建或加载PPO模型（设备无关）
     if CONTINUE_TRAINING:
@@ -262,7 +268,8 @@ if __name__ == "__main__":
     print("=" * 50)
 
     env.close()  # 关闭训练环境
-    test_env = ImageObservationWrapper(MetaDriveEnv(ENV_CONFIG))
+    test_env_config = {**ENV_CONFIG, "start_seed": 42}  # 使用训练时的种子
+    test_env = ImageObservationWrapper(MetaDriveEnv(test_env_config))
 
     for i in range(3):
         total_reward = 0

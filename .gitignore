@@ -45,7 +45,6 @@ assets/
 logs/
 videos/
 captures/
-*.gif
 *.mp4
 
 # Model files

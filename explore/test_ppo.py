@@ -41,13 +41,14 @@ MAP_CONFIG = dict(
 ENV_CONFIG = dict(
     use_render=False,
     manual_control=False,
+    num_agents=1,
     traffic_density=0.0,
     num_scenarios=10000,
     random_agent_model=False,
     on_continuous_line_done=True,
     out_of_route_done=True,
     image_observation=True,
-    sensors=dict(rgb_camera=(RGBCamera, 160, 90)),
+    sensors=dict(rgb_camera=(RGBCamera, 320, 180)),  # 提升分辨率以生成更清的GIF
     vehicle_config=dict(
         show_lidar=False,
         show_navi_mark=False,
@@ -55,7 +56,7 @@ ENV_CONFIG = dict(
         image_source="rgb_camera",
     ),
     map_config=MAP_CONFIG,
-    norm_pixel=True,
+    norm_pixel=False,
 )
 
 
